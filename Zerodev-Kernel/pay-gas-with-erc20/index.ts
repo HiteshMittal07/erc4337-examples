@@ -1,4 +1,3 @@
-import "dotenv/config";
 import {
   createKernelAccount,
   createZeroDevPaymasterClient,
@@ -19,6 +18,9 @@ import { privateKeyToAccount } from "viem/accounts";
 import { sepolia } from "viem/chains";
 import { getEntryPoint, KERNEL_V3_1 } from "@zerodev/sdk/constants";
 
+import "dotenv/config";
+
+// Ensure that required environment variables are set
 if (
   !process.env.BUNDLER_RPC ||
   !process.env.PAYMASTER_RPC ||
@@ -26,24 +28,28 @@ if (
 ) {
   throw new Error("BUNDLER_RPC or PAYMASTER_RPC or PRIVATE_KEY is not set");
 }
-const chain = sepolia;
-const publicClient = createPublicClient({
-  transport: http(process.env.RPC_URL),
-  chain,
-});
-const signer = privateKeyToAccount(process.env.PRIVATE_KEY as Hex);
-
-const TEST_ERC20_ABI = parseAbi([
-  "function mint(address to, uint256 amount) external",
-]);
-const entryPoint = getEntryPoint("0.7");
 
 const main = async () => {
+  const chain = sepolia;
+
+  // Create a public client to interact with the blockchain
+  const publicClient = createPublicClient({
+    transport: http(process.env.SEPOLIA_RPC_URL),
+    chain,
+  });
+
+  // Convert private key to account
+  const signer = privateKeyToAccount(process.env.PRIVATE_KEY as Hex);
+  const entryPoint = getEntryPoint("0.7");
+
+  // Create ECDSA validator for Kernel account
   const ecdsaValidator = await signerToEcdsaValidator(publicClient, {
     entryPoint,
     signer,
     kernelVersion: KERNEL_V3_1,
   });
+
+  // Create a Kernel smart account with the ECDSA validator
   const account = await createKernelAccount(publicClient, {
     plugins: {
       sudo: ecdsaValidator,
@@ -52,6 +58,7 @@ const main = async () => {
     kernelVersion: KERNEL_V3_1,
   });
 
+  // Fetching the user's USDC balance
   const usdcBalance = await publicClient.readContract({
     abi: parseAbi(["function balanceOf(address account) returns (uint256)"]),
     address: gasTokenAddresses[sepolia.id]["USDC"],
@@ -60,32 +67,40 @@ const main = async () => {
   });
   console.info(`USDC balance: ${Number(usdcBalance) / 1_000_000} USDC`);
 
+  // Create a ZeroDev Paymaster client
   const paymasterClient = createZeroDevPaymasterClient({
     chain,
     transport: http(process.env.PAYMASTER_RPC),
   });
 
+  // Create a Kernel client with paymaster and ERC-20 token as gas
   const kernelClient = createKernelAccountClient({
     account,
     chain,
     bundlerTransport: http(process.env.BUNDLER_RPC),
     paymaster: paymasterClient,
     paymasterContext: {
-      token: gasTokenAddresses[sepolia.id]["USDC"],
+      token: gasTokenAddresses[sepolia.id]["USDC"], // Setting ERC-20 token for gas fees
     },
   });
 
   console.log("My account:", account.address);
 
+  /**
+   * Sending a User Operation (UserOp) with multiple encoded calls:
+   * 1. Approve a certain amount of ERC-20 tokens for the paymaster to use as gas.
+   * 2. Execute the original transaction (dummy call in this case).
+   */
   const userOpHash = await kernelClient.sendUserOperation({
     callData: await account.encodeCalls([
+      // Approving the paymaster to use ERC-20 tokens for gas
       await getERC20PaymasterApproveCall(paymasterClient, {
         gasToken: gasTokenAddresses[sepolia.id]["USDC"],
         approveAmount: parseEther("1"),
         entryPoint,
       }),
       {
-        to: zeroAddress,
+        to: zeroAddress, // Dummy call (replace with actual transaction details)
         value: BigInt(0),
         data: "0x",
       },
@@ -94,6 +109,7 @@ const main = async () => {
 
   console.log("UserOp hash:", userOpHash);
 
+  // Wait for the transaction to be confirmed on-chain
   const receipt = await kernelClient.waitForUserOperationReceipt({
     hash: userOpHash,
   });
@@ -103,6 +119,3 @@ const main = async () => {
 };
 
 main();
-
-//PAYMASTER_RPC=https://rpc.zerodev.app/api/v2/paymaster/7f2e0dca-a68b-4979-9db1-23673d30d2fb
-//BUNDLER_RPC=https://rpc.zerodev.app/api/v2/bundler/7f2e0dca-a68b-4979-9db1-23673d30d2fb
