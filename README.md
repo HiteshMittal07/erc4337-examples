@@ -74,7 +74,7 @@ This example illustrates how a Safe account can be used with the Zerodev Kernel 
 
 ## Examples Using Zerodev Kernel Account
 
-Below are different examples demonstrating how Safe accounts can be used for various gas payment methods.
+Below are different examples demonstrating how Zerodev Kernel accounts can be used for various gas payment methods.
 
 ### 1. Paying Gas with ERC-20 Tokens
 
