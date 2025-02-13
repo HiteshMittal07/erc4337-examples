@@ -2,6 +2,16 @@
   "name": "kerneljs-examples",
   "version": "1.0.0",
   "license": "MIT",
+  "scripts": {
+    "pay-with-erc20": "ts-node Zerodev-Kernel/pay-gas-with-erc20",
+    "pay-with-native": "ts-node Zerodev-Kernel/pay-gas-with-native",
+    "sponsored-with-1Balance": "ts-node Zerodev-Kernel/sponsored-gas-with-1Balance",
+    "sponsored-with-zerodev": "ts-node Zerodev-Kernel/sponsored-gas-with-zerodev",
+    "pay-with-erc20-safe": "ts-node Safe/pay-gas-with-erc20",
+    "pay-with-native-safe": "ts-node Safe/pay-gas-with-native",
+    "sponsored-with-1Balance-safe": "ts-node Safe/sponsored-gas-with-1Balance",
+    "sponsored-with-zerodev-safe": "ts-node Safe/sponsored-gas-with-zerodev"
+  },
   "dependencies": {
     "@zerodev/ecdsa-validator": "^5.4.3",
     "@zerodev/hooks": "^5.3.0",
@@ -12,7 +22,7 @@
     "@zerodev/sdk": "^5.4.18",
     "@zerodev/session-key": "^5.5.0",
     "@zerodev/weighted-ecdsa-validator": "^5.4.0",
-    "permissionless": "^0.2.30",
+    "permissionless": "^0.2.33",
     "viem": "^2.22.6"
   },
   "devDependencies": {
