@@ -19,6 +19,16 @@ import { toSafeSmartAccount } from "permissionless/accounts";
 import { entryPoint07Address } from "viem/account-abstraction";
 import "dotenv/config";
 
+type GasPrices = {
+  maxFeePerGas: string;
+  maxPriorityFeePerGas: string;
+};
+
+type EthGetUserOperationGasPriceRpc = {
+  ReturnType: GasPrices;
+  Parameters: [];
+};
+
 // Ensure that required environment variables are set
 if (
   !process.env.BUNDLER_RPC ||
@@ -49,7 +59,6 @@ const main = async () => {
     saltNonce: BigInt(0),
     version: "1.4.1",
   });
-
   console.log("Safe Account Address:", account.address);
 
   // Step 4: Fetch the user's USDC balance
@@ -59,29 +68,41 @@ const main = async () => {
     functionName: "balanceOf",
     args: [account.address],
   });
-  console.info(`USDC balance: ${Number(usdcBalance) / 1_000_000} USDC`);
+  console.log(`USDC balance: ${Number(usdcBalance) / 1_000_000} USDC`);
 
   // Step 5: Create a ZeroDev paymaster client
   const paymasterClient = createZeroDevPaymasterClient({
     chain,
-    transport: http(process.env.PAYMASTER_RPC),
+    transport: http(process.env.PAYMASTER_RPC), // Configure ZeroDev Paymaster RPC with PIMLICO as the provider
   });
 
   // Step 6: Create a Kernel account client with paymaster and ERC-20 token for gas
   const kernelClient = createKernelAccountClient({
     account,
     chain,
-    bundlerTransport: http(process.env.BUNDLER_RPC),
+    bundlerTransport: http(process.env.BUNDLER_RPC), // Gelato Bundler RPC
     paymaster: paymasterClient,
     paymasterContext: {
       token: gasTokenAddresses[sepolia.id]["USDC"],
     },
+    // Custom gas estimation for integrating Gelato Bundler with the ZeroDev SDK
+    userOperation: {
+      estimateFeesPerGas: async ({ bundlerClient }) => {
+        const gasPrices =
+          await bundlerClient.request<EthGetUserOperationGasPriceRpc>({
+            method: "eth_getUserOperationGasPrice",
+            params: [],
+          });
+        return {
+          maxFeePerGas: BigInt(gasPrices.maxFeePerGas),
+          maxPriorityFeePerGas: BigInt(gasPrices.maxPriorityFeePerGas),
+        };
+      },
+    },
   });
 
-  console.log("Kernel Account Client Initialized");
-
   // Step 7: Prepare and send a user operation
-  console.log("Preparing User Operation...");
+  console.log("Preparing/Sending User Operation...");
   const userOpHash = await kernelClient.sendUserOperation({
     callData: await account.encodeCalls([
       // Approving the paymaster to use ERC-20 tokens for gas
@@ -98,7 +119,7 @@ const main = async () => {
     ]),
   });
 
-  console.log("User Operation Hash:", userOpHash);
+  console.log("User Op Task Id:", userOpHash);
 
   // Step 8: Wait for transaction confirmation
   console.log("Waiting for transaction receipt...");

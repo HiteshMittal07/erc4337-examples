@@ -17,8 +17,17 @@ import {
 import { privateKeyToAccount } from "viem/accounts";
 import { sepolia } from "viem/chains";
 import { getEntryPoint, KERNEL_V3_1 } from "@zerodev/sdk/constants";
-
 import "dotenv/config";
+
+type GasPrices = {
+  maxFeePerGas: string;
+  maxPriorityFeePerGas: string;
+};
+
+type EthGetUserOperationGasPriceRpc = {
+  ReturnType: GasPrices;
+  Parameters: [];
+};
 
 // Ensure that required environment variables are set
 if (
@@ -57,6 +66,7 @@ const main = async () => {
     entryPoint,
     kernelVersion: KERNEL_V3_1,
   });
+  console.log("Kernel Account Address:", account.address);
 
   // Fetching the user's USDC balance
   const usdcBalance = await publicClient.readContract({
@@ -70,7 +80,7 @@ const main = async () => {
   // Create a ZeroDev Paymaster client
   const paymasterClient = createZeroDevPaymasterClient({
     chain,
-    transport: http(process.env.PAYMASTER_RPC),
+    transport: http(process.env.PAYMASTER_RPC), // Configure ZeroDev Paymaster RPC with PIMLICO as the provider
   });
 
   // Create a Kernel client with paymaster and ERC-20 token as gas
@@ -82,10 +92,23 @@ const main = async () => {
     paymasterContext: {
       token: gasTokenAddresses[sepolia.id]["USDC"], // Setting ERC-20 token for gas fees
     },
+    // Custom gas estimation for integrating Gelato Bundler with the ZeroDev SDK
+    userOperation: {
+      estimateFeesPerGas: async ({ bundlerClient }) => {
+        const gasPrices =
+          await bundlerClient.request<EthGetUserOperationGasPriceRpc>({
+            method: "eth_getUserOperationGasPrice",
+            params: [],
+          });
+        return {
+          maxFeePerGas: BigInt(gasPrices.maxFeePerGas),
+          maxPriorityFeePerGas: BigInt(gasPrices.maxPriorityFeePerGas),
+        };
+      },
+    },
   });
 
-  console.log("My account:", account.address);
-
+  console.log("Preparing/Sending User Operation...");
   /**
    * Sending a User Operation (UserOp) with multiple encoded calls:
    * 1. Approve a certain amount of ERC-20 tokens for the paymaster to use as gas.
@@ -107,14 +130,18 @@ const main = async () => {
     ]),
   });
 
-  console.log("UserOp hash:", userOpHash);
+  console.log("User Op Task Id:", userOpHash);
 
   // Wait for the transaction to be confirmed on-chain
+  console.log("Waiting for transaction receipt...");
   const receipt = await kernelClient.waitForUserOperationReceipt({
     hash: userOpHash,
   });
 
-  console.log("UserOp completed", receipt.receipt.transactionHash);
+  console.log(
+    "User Operation Completed, Transaction Hash:",
+    receipt.receipt.transactionHash
+  );
   process.exit();
 };
 
