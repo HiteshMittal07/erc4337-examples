@@ -30,7 +30,8 @@ Below are different examples demonstrating how Safe accounts can be used for var
 
 This example shows how a Safe account can be used to pay gas for a user operation using ERC-20 tokens.
 
-- **Bundler & Paymaster:** Zerodev
+- **Bundler:** Gelato
+- **Paymaster:** Zerodev with PIMLICO Provider (i.e https://rpc.zerodev.app/api/v2/paymaster/${ZERODEV_PROJECT_ID}?provider=PIMLICO)
 - **How to run:**
   ```sh
   npm run pay-with-erc20-safe
@@ -78,7 +79,8 @@ Below are different examples demonstrating how Zerodev Kernel accounts can be us
 
 ### 1. Paying Gas with ERC-20 Tokens
 
-- **Bundler & Paymaster:** Zerodev
+- **Bundler:** Gelato
+- **Paymaster:** Zerodev with PIMLICO Provider (i.e https://rpc.zerodev.app/api/v2/paymaster/${ZERODEV_PROJECT_ID}?provider=PIMLICO)
 - **How to run:**
   ```sh
   npm run pay-with-erc20
@@ -116,10 +118,8 @@ Below are different examples demonstrating how Zerodev Kernel accounts can be us
 
 ## Current Limitations
 
-- Paying with ERC-20 tokens doesn't work with both Kernel and Safe accounts when using either Zerodev or Gelato bundlers.
 - Paying with native tokens doesn't work with the Gelato bundler. However, it works with Zerodev for both Safe and Kernel accounts.
 
 ## Further steps
 
-- Ensure ERC-20 token payments function correctly with Kernel accounts and the ZeroDev bundler.
 - Validate that native token payments work seamlessly with the Gelato bundler.
