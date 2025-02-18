@@ -2,23 +2,27 @@ import { createKernelAccount, createKernelAccountClient } from "@zerodev/sdk";
 import { KERNEL_V3_1, getEntryPoint } from "@zerodev/sdk/constants";
 import { signerToEcdsaValidator } from "@zerodev/ecdsa-validator";
 import { privateKeyToAccount } from "viem/accounts";
-import { createPublicClient, Hex, http } from "viem";
+import { createPublicClient, formatEther, Hex, http } from "viem";
 import { baseSepolia } from "viem/chains";
 import { config } from "dotenv";
 
 config();
+// Define types for estimating gas prices.
+type GasPrices = {
+  maxFeePerGas: string;
+  maxPriorityFeePerGas: string;
+};
 
-// Load ZeroDev Project ID from environment variables
-const PROJECT_ID = process.env.ZERODEV_PROJECT_ID;
-if (!PROJECT_ID) {
-  console.error("Please set the ZERODEV_PROJECT_ID environment variable.");
-  process.exit(1);
-}
+type EthGetUserOperationGasPriceRpc = {
+  ReturnType: GasPrices;
+  Parameters: [];
+};
 
 // Define RPC URLs for Base Sepolia network
 const RPC_URL =
   "https://base-sepolia.infura.io/v3/006a677fe90346f9bf6cb52a2a6b340b";
-const BASE_SEPOLIA_BUNDLER_RPC = `https://rpc.zerodev.app/api/v2/bundler/${PROJECT_ID}`;
+const BUNDLER_RPC = `https://api.staging.gelato.digital/bundlers/${baseSepolia.id}/rpc`;
+const GELATO_API_URL = "https://api.staging.gelato.digital";
 
 async function main() {
   // Step 1: Construct a signer using the private key from environment variables
@@ -47,18 +51,36 @@ async function main() {
     kernelVersion: KERNEL_V3_1,
   });
 
-  // Step 5: Construct the Kernel account client using the bundler RPC
+  // Step 5: Construct the Kernel account client using the bundler RPC(Gelato)
   const kernelClient = createKernelAccountClient({
     account,
     chain: baseSepolia,
-    bundlerTransport: http(BASE_SEPOLIA_BUNDLER_RPC),
+    bundlerTransport: http(BUNDLER_RPC),
     client: publicClient,
+    userOperation: {
+      estimateFeesPerGas: async ({ bundlerClient }) => {
+        const gasPrices =
+          await bundlerClient.request<EthGetUserOperationGasPriceRpc>({
+            method: "eth_getUserOperationGasPrice",
+            params: [],
+          });
+        return {
+          maxFeePerGas: BigInt(gasPrices.maxFeePerGas),
+          maxPriorityFeePerGas: BigInt(gasPrices.maxPriorityFeePerGas),
+        };
+      },
+    },
   });
 
   console.log(
     "Kernel account deployed at address:",
     kernelClient.account.address
   );
+
+  const kernelBalance = await publicClient.getBalance({
+    address: kernelClient.account.address,
+  });
+  console.log("Current balance:", formatEther(kernelBalance), "ETH");
 
   // Step 6: Prepare an empty transaction to the zero address
   const callData = await kernelClient.account.encodeCalls([
@@ -75,8 +97,25 @@ async function main() {
 
   // Step 7: Send the user operation
   console.log("Sending user operation...");
-  const userOpHash = await kernelClient.sendUserOperation({ callData });
-  console.log("UserOp Hash:", userOpHash);
+  const userOpTaskId = await kernelClient.sendUserOperation({ callData });
+  console.log("UserOp TaskId:", userOpTaskId);
+
+  await kernelClient.waitForUserOperationReceipt({
+    hash: userOpTaskId,
+    timeout: 15 * 1000,
+  });
+
+  // Give a little wait time before checking task status
+  await new Promise((resolve) => setTimeout(resolve, 5000));
+
+  const taskStatus = await getTaskStatus(userOpTaskId, GELATO_API_URL);
+  console.log("Transaction hash:", taskStatus.task.transactionHash);
+}
+
+async function getTaskStatus(taskId: string, baseUrl: string) {
+  const url = `${baseUrl}/tasks/status/${taskId}`;
+  const response = await fetch(url);
+  return response.json();
 }
 
 main().catch((error) => {
