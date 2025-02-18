@@ -76,10 +76,6 @@ const main = async () => {
     },
   ]);
 
-  console.log("Preparing user operation (empty transaction)...");
-  const userOp = await kernelClient.prepareUserOperation({ callData });
-  console.log("Prepared UserOp:", userOp);
-
   console.log("Sending user operation...");
   const userOpHash = await kernelClient.sendUserOperation({
     callData,
