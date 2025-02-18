@@ -5,7 +5,7 @@ import {
 } from "@zerodev/sdk";
 import { KERNEL_V3_1, getEntryPoint } from "@zerodev/sdk/constants";
 import { signerToEcdsaValidator } from "@zerodev/ecdsa-validator";
-import { generatePrivateKey, privateKeyToAccount } from "viem/accounts";
+import { privateKeyToAccount } from "viem/accounts";
 import { createPublicClient, Hex, http } from "viem";
 import { baseSepolia } from "viem/chains";
 import { config } from "dotenv";
@@ -45,7 +45,7 @@ if (!PROJECT_ID) {
 const RPC_URL =
   "https://base-sepolia.infura.io/v3/006a677fe90346f9bf6cb52a2a6b340b";
 const CHAIN_ID = 84532;
-const AMOY_STAGING_BUNDLER_RPC = `https://api.staging.gelato.digital/bundlers/${CHAIN_ID}/rpc`;
+const STAGING_BUNDLER_RPC = `https://api.staging.gelato.digital/bundlers/${CHAIN_ID}/rpc`;
 const PAYMASTER_RPC = `https://rpc.zerodev.app/api/v2/paymaster/${PROJECT_ID}?provider=PIMLICO`;
 
 async function getTaskStatus(taskId: string): Promise<GelatoTask> {
@@ -91,7 +91,7 @@ async function main() {
   const kernelClient = createKernelAccountClient({
     account,
     chain: baseSepolia,
-    bundlerTransport: http(AMOY_STAGING_BUNDLER_RPC),
+    bundlerTransport: http(STAGING_BUNDLER_RPC),
     client: publicClient,
     paymaster: zerodevPaymaster,
     userOperation: {
